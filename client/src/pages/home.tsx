@@ -43,13 +43,17 @@ export default function Home() {
   // Clock in mutation
   const clockInMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/time-entries/clock-in"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics/user-stats"] });
+    onSuccess: async () => {
+      // Force refresh the active entry and user stats
+      await queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/user-stats"] });
+      // Refetch immediately to ensure UI updates
+      await queryClient.refetchQueries({ queryKey: ["/api/time-entries/active"] });
       toast({
         title: "Clocked In Successfully",
         description: `Time: ${currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
       });
+      console.log('Clock in successful, cache invalidated and refetched');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -77,9 +81,12 @@ export default function Home() {
       employeeSignature,
       supervisorSignature,
     }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics/user-stats"] });
+    onSuccess: async () => {
+      // Force refresh the active entry and user stats
+      await queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/analytics/user-stats"] });
+      // Refetch immediately to ensure UI updates
+      await queryClient.refetchQueries({ queryKey: ["/api/time-entries/active"] });
       setShowSignatures(false);
       setEmployeeSignature("");
       setSupervisorSignature("");
@@ -87,6 +94,7 @@ export default function Home() {
         title: "Clocked Out Successfully",
         description: "Time entry completed with signatures",
       });
+      console.log('Clock out successful, cache invalidated and refetched');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -125,6 +133,7 @@ export default function Home() {
   };
 
   const handleSwipeComplete = () => {
+    console.log('Swipe completed, activeEntry:', activeEntry);
     if (activeEntry) {
       setShowSignatures(true);
     } else {
