@@ -5,6 +5,18 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertUserSchema, insertTimeEntrySchema, updateUserSchema, updateTimeEntrySchema } from "@shared/schema";
 import { z } from "zod";
 
+// Validation schema for clock-out signatures
+const clockOutSchema = z.object({
+  employeeSignature: z.string().min(1, "Employee signature is required").refine(
+    (sig) => sig.startsWith('data:image/') && sig.includes('base64,'),
+    "Employee signature must be a valid base64 image"
+  ),
+  supervisorSignature: z.string().min(1, "Supervisor signature is required").refine(
+    (sig) => sig.startsWith('data:image/') && sig.includes('base64,'),
+    "Supervisor signature must be a valid base64 image"
+  ),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -76,11 +88,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
-      const { employeeSignature, supervisorSignature } = req.body;
+      
+      // Validate signatures
+      const validatedData = clockOutSchema.parse(req.body);
+      const { employeeSignature, supervisorSignature } = validatedData;
 
       const timeEntry = await storage.getTimeEntry(id);
       if (!timeEntry || timeEntry.userId !== userId) {
         return res.status(404).json({ message: "Time entry not found" });
+      }
+
+      if (timeEntry.status !== "active") {
+        return res.status(400).json({ message: "Time entry is not active" });
       }
 
       const clockOutTime = new Date();
@@ -97,6 +116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedEntry);
     } catch (error) {
       console.error("Error clocking out:", error);
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors.map(e => e.message) 
+        });
+      }
+      
       res.status(500).json({ message: "Failed to clock out" });
     }
   });

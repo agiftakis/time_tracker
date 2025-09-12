@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2, Clock } from "lucide-react";
 import { SwipeSlider } from "@/components/ui/swipe-slider";
 import { SignaturePad } from "@/components/ui/signature-pad";
@@ -53,7 +54,6 @@ export default function Home() {
         title: "Clocked In Successfully",
         description: `Time: ${currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
       });
-      console.log('Clock in successful, cache invalidated and refetched');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -94,9 +94,8 @@ export default function Home() {
         title: "Clocked Out Successfully",
         description: "Time entry completed with signatures",
       });
-      console.log('Clock out successful, cache invalidated and refetched');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -108,9 +107,16 @@ export default function Home() {
         }, 500);
         return;
       }
+      
+      // Handle validation errors from server
+      let errorMessage = error.message || "Unable to clock out";
+      if (error.errors && Array.isArray(error.errors)) {
+        errorMessage = error.errors.join(", ");
+      }
+      
       toast({
         title: "Clock Out Failed",
-        description: error.message || "Unable to clock out",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -133,7 +139,6 @@ export default function Home() {
   };
 
   const handleSwipeComplete = () => {
-    console.log('Swipe completed, activeEntry:', activeEntry);
     if (activeEntry) {
       setShowSignatures(true);
     } else {
@@ -256,7 +261,7 @@ export default function Home() {
             
             <SwipeSlider
               onSwipeComplete={handleSwipeComplete}
-              isLoading={clockInMutation.isPending}
+              isLoading={clockInMutation.isPending || clockOutMutation.isPending}
               variant={isActive ? "destructive" : "primary"}
               text={isActive ? "Slide to clock out" : "Slide to clock in"}
               data-testid="swipe-slider"
@@ -277,51 +282,54 @@ export default function Home() {
         </Card>
 
         {/* Signature Modal */}
-        {showSignatures && (
-          <Card className="mt-6">
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Digital Signatures Required</h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Employee Signature</label>
-                  <SignaturePad
-                    onSignatureChange={setEmployeeSignature}
-                    data-testid="signature-employee"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Supervisor Signature</label>
-                  <SignaturePad
-                    onSignatureChange={setSupervisorSignature}
-                    data-testid="signature-supervisor"
-                  />
-                </div>
-                
-                <div className="flex space-x-4">
-                  <Button
-                    onClick={() => setShowSignatures(false)}
-                    variant="outline"
-                    className="flex-1"
-                    data-testid="button-cancel-signatures"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleClockOut}
-                    disabled={clockOutMutation.isPending || !employeeSignature || !supervisorSignature}
-                    className="flex-1"
-                    data-testid="button-submit-signatures"
-                  >
-                    {clockOutMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Complete Clock Out
-                  </Button>
-                </div>
+        <Dialog open={showSignatures} onOpenChange={setShowSignatures}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-signatures">
+            <DialogHeader>
+              <DialogTitle>Digital Signatures Required</DialogTitle>
+              <DialogDescription>
+                Both employee and supervisor signatures are required to complete clock out.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Employee Signature</label>
+                <SignaturePad
+                  onSignatureChange={setEmployeeSignature}
+                  data-testid="signature-employee"
+                />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Supervisor Signature</label>
+                <SignaturePad
+                  onSignatureChange={setSupervisorSignature}
+                  data-testid="signature-supervisor"
+                />
+              </div>
+              
+              <div className="flex space-x-4">
+                <Button
+                  onClick={() => setShowSignatures(false)}
+                  variant="outline"
+                  className="flex-1"
+                  data-testid="button-cancel-clock-out"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleClockOut}
+                  disabled={clockOutMutation.isPending || !employeeSignature || !supervisorSignature}
+                  className="flex-1"
+                  data-testid="button-submit-clock-out"
+                >
+                  {clockOutMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Complete Clock Out
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
