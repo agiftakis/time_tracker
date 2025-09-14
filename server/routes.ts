@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertUserSchema, insertTimeEntrySchema, updateUserSchema, updateTimeEntrySchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -18,15 +17,11 @@ const clockOutSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Auth routes (UNPROTECTED for now)
+  app.get('/api/auth/user', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      // TODO: Replace with new auth/session user lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -34,26 +29,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User routes
-  app.put('/api/users/profile', isAuthenticated, async (req: any, res) => {
+  app.put('/api/users/profile', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const validatedData = updateUserSchema.parse(req.body);
-      const user = await storage.updateUser(userId, validatedData);
-      res.json(user);
+      // TODO: Replace with new auth/session user lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
 
-  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/users', async (req: any, res) => {
     try {
-      const currentUser = await storage.getUser(req.user.claims.sub);
-      if (!currentUser?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      const users = await storage.getAllUsers();
-      res.json(users);
+      // TODO: Add admin/user session verification
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -61,105 +50,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Time entry routes
-  app.post('/api/time-entries/clock-in', isAuthenticated, async (req: any, res) => {
+  app.post('/api/time-entries/clock-in', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      
-      // Check if user already has an active session
-      const activeEntry = await storage.getActiveTimeEntry(userId);
-      if (activeEntry) {
-        return res.status(400).json({ message: "User is already clocked in" });
-      }
-
-      const timeEntry = await storage.createTimeEntry({
-        userId,
-        clockInTime: new Date(),
-        status: "active"
-      });
-      
-      res.json(timeEntry);
+      // TODO: Add user session check
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error clocking in:", error);
       res.status(500).json({ message: "Failed to clock in" });
     }
   });
 
-  app.put('/api/time-entries/:id/clock-out', isAuthenticated, async (req: any, res) => {
+  app.put('/api/time-entries/:id/clock-out', async (req: any, res) => {
     try {
-      const { id } = req.params;
-      const userId = req.user.claims.sub;
-      
-      // Validate signatures
-      const validatedData = clockOutSchema.parse(req.body);
-      const { employeeSignature, supervisorSignature } = validatedData;
-
-      const timeEntry = await storage.getTimeEntry(id);
-      if (!timeEntry || timeEntry.userId !== userId) {
-        return res.status(404).json({ message: "Time entry not found" });
-      }
-
-      if (timeEntry.status !== "active") {
-        return res.status(400).json({ message: "Time entry is not active" });
-      }
-
-      const clockOutTime = new Date();
-      const totalMinutes = Math.floor((clockOutTime.getTime() - timeEntry.clockInTime.getTime()) / (1000 * 60));
-
-      const updatedEntry = await storage.updateTimeEntry(id, {
-        clockOutTime,
-        totalHours: totalMinutes,
-        employeeSignature,
-        supervisorSignature,
-        status: "completed"
-      });
-
-      res.json(updatedEntry);
+      // TODO: Add user/session lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error clocking out:", error);
-      
-      // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           message: "Validation failed", 
           errors: error.errors.map(e => e.message) 
         });
       }
-      
       res.status(500).json({ message: "Failed to clock out" });
     }
   });
 
-  app.get('/api/time-entries/active', isAuthenticated, async (req: any, res) => {
+  app.get('/api/time-entries/active', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const activeEntry = await storage.getActiveTimeEntry(userId);
-      res.json(activeEntry);
+      // TODO: Add user/session lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching active entry:", error);
       res.status(500).json({ message: "Failed to fetch active entry" });
     }
   });
 
-  app.get('/api/time-entries/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/time-entries/user', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const entries = await storage.getUserTimeEntries(userId, limit);
-      res.json(entries);
+      // TODO: Add user/session lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching time entries:", error);
       res.status(500).json({ message: "Failed to fetch time entries" });
     }
   });
 
-  app.get('/api/time-entries', isAuthenticated, async (req: any, res) => {
+  app.get('/api/time-entries', async (req: any, res) => {
     try {
-      const currentUser = await storage.getUser(req.user.claims.sub);
-      if (!currentUser?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      const entries = await storage.getAllTimeEntries();
-      res.json(entries);
+      // TODO: Add admin/session check
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching all time entries:", error);
       res.status(500).json({ message: "Failed to fetch time entries" });
@@ -167,37 +107,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get('/api/analytics/user-stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/analytics/user-stats', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const weeklyHours = await storage.getUserWeeklyHours(userId);
-      const monthlyHours = await storage.getUserMonthlyHours(userId);
-      
-      res.json({
-        weeklyHours: Math.floor(weeklyHours / 60), // Convert to hours
-        monthlyHours: Math.floor(monthlyHours / 60),
-        weeklyMinutes: weeklyHours % 60,
-        monthlyMinutes: monthlyHours % 60
-      });
+      // TODO: Add user/session lookup
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching user stats:", error);
       res.status(500).json({ message: "Failed to fetch user stats" });
     }
   });
 
-  app.get('/api/analytics/system-stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/analytics/system-stats', async (req: any, res) => {
     try {
-      const currentUser = await storage.getUser(req.user.claims.sub);
-      if (!currentUser?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      
-      const stats = await storage.getSystemStats();
-      res.json({
-        ...stats,
-        weeklyHours: Math.floor(stats.weeklyHours / 60),
-        avgHours: Math.floor(stats.avgHours / 60)
-      });
+      // TODO: Add admin/session check
+      res.status(501).json({ message: "Auth not set up yet" });
     } catch (error) {
       console.error("Error fetching system stats:", error);
       res.status(500).json({ message: "Failed to fetch system stats" });
